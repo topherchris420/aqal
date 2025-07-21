@@ -75,7 +75,7 @@ The AQAL Integral Development Studio is a **completely self-contained** enterpri
 
 ### 1. Clone and Install
 \`\`\`bash
-git clone https://github.com/your-org/aqal-integral-app.git
+git clone https://github.com/tooherchris420/aqal-integral-app.git
 cd aqal-integral-app
 npm install
 \`\`\`
