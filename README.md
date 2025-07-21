@@ -1,7 +1,7 @@
 # AQAL Integral Development Studio
 
-[![Deployed from christoher](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/christophers-projects-e5fc9e47/v0-aqal-integral-map-app)
-[![Built by Vers3Dynamics](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/RpS8Ba8QGpt)
+[![Deployed from christoher](https://img.shields.io/badge/Deployed%20by-Christopher-black?style=for-the-badge&logo=vercel)](https://vercel.com/christophers-projects-e5fc9e47/v0-aqal-integral-map-app)
+[![Built by Vers3Dynamics](https://img.shields.io/badge/Built%20by-Vers3Dynamics-black?style=for-the-badge)](https://v0.dev/chat/projects/RpS8Ba8QGpt)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
