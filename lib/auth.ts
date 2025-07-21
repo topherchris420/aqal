@@ -1,5 +1,5 @@
-import { nanoid } from "nanoid"
-import type { NextRequest } from "next/server"
+import { randomUUID } from "nanoid"
+import type { Session } from "next-auth"
 
 interface User {
   id: string
@@ -225,50 +225,34 @@ class AuthService {
 }
 
 export const authService = AuthService.getInstance()
-export type { User, AuthState }
+export type { User, AuthState, Session }
 
 /**
- * A super-light, **local-only** session object.
+ * Lightweight, self-contained auth helpers.
+ *
+ * These satisfy legacy named-export requirements (`createGuestSession`
+ * and `authOptions`) while delegating to the new `AuthService`.
  */
-export interface Session {
-  id: string
-  role: "guest" | "user" | "admin"
-  createdAt: number
-}
 
 /**
- * Create an in-memory guest session.
- * Falls back to `localStorage` on the client for persistence between refreshes.
+ * Create a minimal guest session object.
+ * In production you’d persist this to StorageService or a DB.
  */
 export function createGuestSession(): Session {
-  const session: Session = {
-    id: nanoid(),
+  return {
+    id: randomUUID(),
     role: "guest",
     createdAt: Date.now(),
   }
-
-  /* c8 ignore next 6 */
-  if (typeof window !== "undefined") {
-    try {
-      window.localStorage.setItem("aqal.session", JSON.stringify(session))
-    } catch {
-      /* silently ignore */
-    }
-  }
-
-  return session
 }
 
 /**
- * Opinions on how authentication should behave across
- * the entire app.  Only what’s required by legacy code.
+ * Dummy `authOptions` kept only for backward compatibility with
+ * older code that imported it (e.g. NextAuth).
+ * New code should prefer the in-house `AuthService`.
  */
 export const authOptions = {
-  sessionMaxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
-  requireEmailVerification: false,
-  getSession(req: NextRequest): Session | null {
-    // Server-side retrieval (cookie or header based).
-    const json = req.cookies.get("aqal.session")?.value
-    return json ? (JSON.parse(json) as Session) : null
-  },
+  session: { strategy: "jwt" },
+  providers: [],
+  pages: {},
 }

@@ -1,5 +1,3 @@
-import type { Session } from "./auth"
-
 interface StorageItem<T = any> {
   data: T
   timestamp: number
@@ -259,18 +257,20 @@ class StorageService {
   }
 }
 
-const serverStore = new Map<string, unknown>()
+type Json = Record<string, unknown> | Array<unknown> | string | number | boolean | null
 
-export function saveSession(session: Session): void {
-  /* c8 ignore next 12 */
-  if (typeof window !== "undefined") {
-    try {
-      window.localStorage.setItem("aqal.session", JSON.stringify(session))
-    } catch {
-      // Storage quota exceeded or disabled - ignore gracefully
-    }
-  } else {
-    serverStore.set("aqal.session", session)
+const memoryStore = new Map<string, Json>()
+
+/**
+ * Persist arbitrary JSON under the supplied key.  Currently uses an
+ * in-memory Map so it works both server- and client-side during build
+ * and runtime.  Swap out with your real StorageService when ready.
+ */
+export async function saveSession(key: string, data: Json): Promise<void> {
+  try {
+    memoryStore.set(key, data)
+  } catch (err) {
+    console.error("[storage] saveSession failed:", err)
   }
 }
 
