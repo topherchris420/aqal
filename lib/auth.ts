@@ -1,3 +1,6 @@
+import { nanoid } from "nanoid"
+import type { NextRequest } from "next/server"
+
 interface User {
   id: string
   email: string
@@ -224,28 +227,48 @@ class AuthService {
 export const authService = AuthService.getInstance()
 export type { User, AuthState }
 
-/* ------------------------------------------------------------------
- * Legacy-compatibility helpers - required by existing code paths
- * -----------------------------------------------------------------*/
+/**
+ * A super-light, **local-only** session object.
+ */
+export interface Session {
+  id: string
+  role: "guest" | "user" | "admin"
+  createdAt: number
+}
 
 /**
- * Creates a 24-hour guest session (legacy API).
- * @returns A minimal session object compatible with previous code.
+ * Create an in-memory guest session.
+ * Falls back to `localStorage` on the client for persistence between refreshes.
  */
-export const createGuestSession = () => ({
-  user: {
-    id: `guest_${Date.now()}`,
-    email: "guest@local",
-    name: "Guest User",
+export function createGuestSession(): Session {
+  const session: Session = {
+    id: nanoid(),
     role: "guest",
-  },
-  expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-})
+    createdAt: Date.now(),
+  }
+
+  /* c8 ignore next 6 */
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem("aqal.session", JSON.stringify(session))
+    } catch {
+      /* silently ignore */
+    }
+  }
+
+  return session
+}
 
 /**
- * Stub for NextAuth options retained only for type-compatibility.
- * The new AuthService replaces NextAuth, but some modules still import
- * this symbol.  We export an empty object typed as any to avoid
- * compile-time errors while keeping tree-shaking friendly.
+ * Opinions on how authentication should behave across
+ * the entire app.  Only what’s required by legacy code.
  */
-export const authOptions: any = {}
+export const authOptions = {
+  sessionMaxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+  requireEmailVerification: false,
+  getSession(req: NextRequest): Session | null {
+    // Server-side retrieval (cookie or header based).
+    const json = req.cookies.get("aqal.session")?.value
+    return json ? (JSON.parse(json) as Session) : null
+  },
+}

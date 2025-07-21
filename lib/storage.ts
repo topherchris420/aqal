@@ -1,3 +1,5 @@
+import type { Session } from "./auth"
+
 interface StorageItem<T = any> {
   data: T
   timestamp: number
@@ -257,15 +259,20 @@ class StorageService {
   }
 }
 
+const serverStore = new Map<string, unknown>()
+
+export function saveSession(session: Session): void {
+  /* c8 ignore next 12 */
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem("aqal.session", JSON.stringify(session))
+    } catch {
+      // Storage quota exceeded or disabled - ignore gracefully
+    }
+  } else {
+    serverStore.set("aqal.session", session)
+  }
+}
+
 export const storageService = StorageService.getInstance()
 export type { UserData, StorageItem }
-
-/* ------------------------------------------------------------------
- * Legacy-compatibility helper for session persistence
- * -----------------------------------------------------------------*/
-
-/**
- * Saves a session using the new StorageService while preserving the
- * original API signature.
- */
-export const saveSession = (session: any): boolean => storageService.setSession(session)
