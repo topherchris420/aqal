@@ -1,247 +1,362 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Sparkles, TrendingUp, AlertTriangle, Target, Lightbulb, ArrowRight } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Brain,
+  Lightbulb,
+  TrendingUp,
+  Target,
+  BookOpen,
+  Sparkles,
+  RefreshCw,
+  ChevronRight,
+  Star,
+  Clock,
+  Users,
+  Zap,
+} from "lucide-react"
+import { aiEngine } from "@/lib/ai-engine"
+import { storageService } from "@/lib/storage"
+import { authService } from "@/lib/auth"
 
 interface AIInsightsProps {
   userProfile: any
 }
 
 export default function AIInsights({ userProfile }: AIInsightsProps) {
-  // Generate insights based on user profile
-  const generateInsights = () => {
-    const insights = {
-      integrationGaps: [],
-      shadowAspects: [],
-      alignmentPatterns: [],
-      growthRecommendations: [],
-    }
+  const [insights, setInsights] = useState<any>(null)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [activeTab, setActiveTab] = useState("overview")
 
-    // Analyze quadrant balance
-    const quadrantStrengths = Object.entries(userProfile.quadrants).map(([id, quadrant]: [string, any]) => ({
-      id,
-      strength: quadrant.components.length,
-    }))
+  useEffect(() => {
+    loadCachedInsights()
+  }, [])
 
-    const maxStrength = Math.max(...quadrantStrengths.map((q) => q.strength))
-    const minStrength = Math.min(...quadrantStrengths.map((q) => q.strength))
-
-    if (maxStrength - minStrength > 2) {
-      const weakestQuadrant = quadrantStrengths.find((q) => q.strength === minStrength)
-      insights.integrationGaps.push({
-        type: "Quadrant Imbalance",
-        description: `Your ${weakestQuadrant?.id.replace("_", " ")} quadrant needs more attention for balanced development.`,
-        severity: "medium",
-      })
-    }
-
-    // Analyze developmental lines
-    const lineValues = Object.entries(userProfile.developmentalLines) as [string, number][]
-    const avgLine = lineValues.reduce((sum, [, val]) => sum + val, 0) / lineValues.length
-
-    lineValues.forEach(([line, value]) => {
-      if (value < avgLine - 2) {
-        insights.shadowAspects.push({
-          type: "Underdeveloped Line",
-          description: `Your ${line} development is significantly below your average. This may create blind spots.`,
-          line,
-          severity: "high",
-        })
+  const loadCachedInsights = () => {
+    const user = authService.getCurrentUser()
+    if (user) {
+      const userData = storageService.getUserData(user.id)
+      if (userData?.insights) {
+        setInsights(userData.insights)
       }
-    })
-
-    // Spiral Dynamics insights
-    const spiralInsights = {
-      orange: "Focus on integrating green values of community and sustainability with your achievement orientation.",
-      green: "Consider developing yellow integral thinking to transcend either/or perspectives.",
-      yellow: "Explore turquoise holistic consciousness while maintaining your systemic flexibility.",
-      blue: "Work on developing orange strategic thinking while honoring your sense of order.",
-      red: "Develop blue purposeful structure while maintaining your power and energy.",
     }
-
-    if (spiralInsights[userProfile.spiralTier as keyof typeof spiralInsights]) {
-      insights.growthRecommendations.push({
-        type: "Spiral Evolution",
-        description: spiralInsights[userProfile.spiralTier as keyof typeof spiralInsights],
-        priority: "high",
-      })
-    }
-
-    // Alignment patterns
-    const cognitiveEmotionalGap = Math.abs(
-      userProfile.developmentalLines.cognitive - userProfile.developmentalLines.emotional,
-    )
-    if (cognitiveEmotionalGap > 3) {
-      insights.alignmentPatterns.push({
-        type: "Cognitive-Emotional Misalignment",
-        description:
-          "There's a significant gap between your cognitive and emotional development, which may cause internal conflicts.",
-        recommendation: "Focus on integrating thinking and feeling through practices like mindfulness or therapy.",
-      })
-    }
-
-    return insights
   }
 
-  const insights = generateInsights()
+  const generateInsights = async () => {
+    setIsGenerating(true)
+
+    try {
+      const newInsights = await aiEngine.generateInsights(userProfile)
+      setInsights(newInsights)
+
+      // Save insights to storage
+      const user = authService.getCurrentUser()
+      if (user) {
+        storageService.saveUserData(user.id, { insights: newInsights })
+      }
+    } catch (error) {
+      console.error("Failed to generate insights:", error)
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const InsightCard = ({
+    title,
+    description,
+    confidence,
+    priority,
+    category,
+    actionable = false,
+  }: {
+    title: string
+    description: string
+    confidence: number
+    priority: "high" | "medium" | "low"
+    category: string
+    actionable?: boolean
+  }) => (
+    <Card className="elevation-1 hover:elevation-2 transition-smooth animate-fade-in">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div
+              className={`p-1.5 rounded-lg ${
+                priority === "high"
+                  ? "bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400"
+                  : priority === "medium"
+                    ? "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-400"
+                    : "bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400"
+              }`}
+            >
+              <Lightbulb className="w-3 h-3" />
+            </div>
+            <Badge variant="outline" className="text-xs">
+              {category}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Star className="w-3 h-3" />
+            {Math.round(confidence * 100)}%
+          </div>
+        </div>
+
+        <h4 className="font-medium mb-2">{title}</h4>
+        <p className="text-sm text-muted-foreground mb-3">{description}</p>
+
+        {actionable && (
+          <Button size="sm" variant="outline" className="w-full animate-ripple bg-transparent">
+            Take Action
+            <ChevronRight className="w-3 h-3 ml-1" />
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  )
+
+  const DevelopmentPath = ({ path }: { path: any }) => (
+    <Card className="elevation-1">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Target className="w-4 h-4" />
+            {path.title}
+          </CardTitle>
+          <Badge
+            variant={path.timeframe === "short" ? "default" : path.timeframe === "medium" ? "secondary" : "outline"}
+          >
+            {path.timeframe === "short" ? "1-3 months" : path.timeframe === "medium" ? "3-6 months" : "6+ months"}
+          </Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">{path.description}</p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span>Progress</span>
+            <span>{path.progress}%</span>
+          </div>
+          <Progress value={path.progress} className="h-2" />
+        </div>
+
+        <div className="space-y-2">
+          <h5 className="font-medium text-sm">Next Steps:</h5>
+          <ul className="space-y-1">
+            {path.nextSteps.map((step: string, index: number) => (
+              <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
+                <ChevronRight className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                {step}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <Button className="w-full animate-ripple" size="sm">
+          Start Development Path
+        </Button>
+      </CardContent>
+    </Card>
+  )
+
+  if (!insights) {
+    return (
+      <Card className="elevation-2">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Brain className="w-5 h-5" />
+            AI Insights
+          </CardTitle>
+          <p className="text-muted-foreground">
+            Get personalized insights and recommendations based on your integral profile
+          </p>
+        </CardHeader>
+        <CardContent className="text-center py-12">
+          <div className="space-y-4">
+            <div className="w-16 h-16 mx-auto bg-gradient-primary rounded-full flex items-center justify-center">
+              <Sparkles className="w-8 h-8 text-white" />
+            </div>
+            <div>
+              <h3 className="font-medium mb-2">Ready for AI Analysis</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Generate personalized insights based on your current profile and development goals
+              </p>
+              <Button onClick={generateInsights} disabled={isGenerating} className="animate-ripple elevation-1">
+                {isGenerating ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Brain className="w-4 h-4 mr-2" />
+                    Generate Insights
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <div className="space-y-6">
-      {/* AI Insights Header */}
-      <Card>
+      <Card className="elevation-2">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-purple-600" />
-            AI-Generated Insights
-          </CardTitle>
-          <p className="text-gray-600">Personalized analysis of your integral development profile</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="w-5 h-5" />
+                AI Insights
+              </CardTitle>
+              <p className="text-muted-foreground">Personalized analysis of your integral development</p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={generateInsights}
+              disabled={isGenerating}
+              className="animate-ripple bg-transparent"
+            >
+              {isGenerating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            </Button>
+          </div>
         </CardHeader>
       </Card>
 
-      {/* Integration Gaps */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-orange-600" />
-            Integration Gaps
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {insights.integrationGaps.length === 0 ? (
-            <Alert>
-              <Lightbulb className="h-4 w-4" />
-              <AlertDescription>
-                Great! Your development appears well-integrated across quadrants. Continue building on this balanced
-                foundation.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            insights.integrationGaps.map((gap, index) => (
-              <Alert key={index} className="border-orange-200 bg-orange-50">
-                <AlertTriangle className="h-4 w-4 text-orange-600" />
-                <AlertDescription>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <span className="font-medium">{gap.type}:</span> {gap.description}
-                    </div>
-                    <Badge variant={gap.severity === "high" ? "destructive" : "secondary"}>{gap.severity}</Badge>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-4 bg-card elevation-1">
+          <TabsTrigger value="overview" className="animate-ripple">
+            <TrendingUp className="w-4 h-4 mr-2" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="recommendations" className="animate-ripple">
+            <Lightbulb className="w-4 h-4 mr-2" />
+            Insights
+          </TabsTrigger>
+          <TabsTrigger value="paths" className="animate-ripple">
+            <Target className="w-4 h-4 mr-2" />
+            Paths
+          </TabsTrigger>
+          <TabsTrigger value="resources" className="animate-ripple">
+            <BookOpen className="w-4 h-4 mr-2" />
+            Resources
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Card className="elevation-1">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+                    <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                   </div>
-                </AlertDescription>
-              </Alert>
-            ))
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Shadow Aspects */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="w-5 h-5 text-red-600" />
-            Shadow Aspects & Blind Spots
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {insights.shadowAspects.length === 0 ? (
-            <Alert>
-              <Lightbulb className="h-4 w-4" />
-              <AlertDescription>
-                Your developmental lines appear relatively balanced. Keep monitoring for emerging blind spots as you
-                grow.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            insights.shadowAspects.map((shadow, index) => (
-              <Alert key={index} className="border-red-200 bg-red-50">
-                <Target className="h-4 w-4 text-red-600" />
-                <AlertDescription>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <span className="font-medium">{shadow.type}:</span> {shadow.description}
-                    </div>
-                    <Badge variant="destructive">{shadow.severity}</Badge>
-                  </div>
-                </AlertDescription>
-              </Alert>
-            ))
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Alignment Patterns */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-blue-600" />
-            Alignment Patterns
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {insights.alignmentPatterns.length === 0 ? (
-            <Alert>
-              <Lightbulb className="h-4 w-4" />
-              <AlertDescription>
-                Your interior/exterior and individual/collective aspects appear well-aligned. This creates a strong
-                foundation for growth.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            insights.alignmentPatterns.map((pattern, index) => (
-              <Alert key={index} className="border-blue-200 bg-blue-50">
-                <TrendingUp className="h-4 w-4 text-blue-600" />
-                <AlertDescription>
                   <div>
-                    <span className="font-medium">{pattern.type}:</span> {pattern.description}
-                    <div className="mt-2 flex items-center gap-2 text-sm">
-                      <ArrowRight className="w-3 h-3" />
-                      <span className="italic">{pattern.recommendation}</span>
-                    </div>
+                    <p className="text-sm text-muted-foreground">Development Score</p>
+                    <p className="text-2xl font-bold">{insights.overallScore}/100</p>
                   </div>
-                </AlertDescription>
-              </Alert>
-            ))
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Growth Recommendations */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Lightbulb className="w-5 h-5 text-green-600" />
-            Growth Recommendations
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {insights.growthRecommendations.map((rec, index) => (
-            <Alert key={index} className="border-green-200 bg-green-50">
-              <Lightbulb className="h-4 w-4 text-green-600" />
-              <AlertDescription>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="font-medium">{rec.type}:</span> {rec.description}
-                  </div>
-                  <Badge className="bg-green-100 text-green-800">{rec.priority}</Badge>
                 </div>
-              </AlertDescription>
-            </Alert>
-          ))}
+              </CardContent>
+            </Card>
 
-          {/* General Recommendations */}
-          <Alert className="border-green-200 bg-green-50">
-            <Lightbulb className="h-4 w-4 text-green-600" />
-            <AlertDescription>
-              <div>
-                <span className="font-medium">Next Steps:</span> Consider exploring the expansion packs to deepen your
-                development in specific areas. Shadow work and contemplative practices are particularly valuable for
-                integral growth.
-              </div>
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
+            <Card className="elevation-1">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
+                    <Target className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Active Goals</p>
+                    <p className="text-2xl font-bold">{insights.activeGoals}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="elevation-1">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
+                    <Zap className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Growth Areas</p>
+                    <p className="text-2xl font-bold">{insights.growthAreas}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="elevation-1">
+            <CardHeader>
+              <CardTitle className="text-lg">Development Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground leading-relaxed">{insights.summary}</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="recommendations" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            {insights.recommendations.map((insight: any, index: number) => (
+              <InsightCard
+                key={index}
+                title={insight.title}
+                description={insight.description}
+                confidence={insight.confidence}
+                priority={insight.priority}
+                category={insight.category}
+                actionable={insight.actionable}
+              />
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="paths" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            {insights.developmentPaths.map((path: any, index: number) => (
+              <DevelopmentPath key={index} path={path} />
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="resources" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {insights.resources.map((resource: any, index: number) => (
+              <Card key={index} className="elevation-1 hover:elevation-2 transition-smooth">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
+                      <BookOpen className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-medium mb-1">{resource.title}</h4>
+                      <p className="text-sm text-muted-foreground mb-2">{resource.description}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Clock className="w-3 h-3" />
+                        {resource.duration}
+                        <Users className="w-3 h-3 ml-2" />
+                        {resource.difficulty}
+                      </div>
+                    </div>
+                  </div>
+                  <Button size="sm" variant="outline" className="w-full mt-3 animate-ripple bg-transparent">
+                    Access Resource
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

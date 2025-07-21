@@ -1,282 +1,326 @@
 "use client"
 
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Brain, Eye, Compass, Mountain, Waves, Star, Lock, CheckCircle, Plus } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Plus,
+  BookOpen,
+  Users,
+  Briefcase,
+  Heart,
+  Brain,
+  Sparkles,
+  Clock,
+  Star,
+  Play,
+  Download,
+  CheckCircle,
+} from "lucide-react"
+import { storageService } from "@/lib/storage"
+import { authService } from "@/lib/auth"
 
 interface ExpansionPacksProps {
   userProfile: any
 }
 
-const expansionPacks = [
-  {
-    id: "shadow-work",
-    title: "Shadow Work Integration",
-    description: "Explore and integrate your unconscious aspects for wholeness",
-    icon: Eye,
-    color: "bg-gray-100 border-gray-300",
-    difficulty: "Intermediate",
-    duration: "4-6 weeks",
-    unlocked: true,
-    modules: [
-      "Shadow Identification Exercises",
-      "Projection Reclaiming",
-      "Dream Work Integration",
-      "Somatic Shadow Release",
-    ],
-    benefits: [
-      "Increased self-awareness",
-      "Reduced projection",
-      "Enhanced emotional regulation",
-      "Greater authenticity",
-    ],
-  },
-  {
-    id: "contemplative-tools",
-    title: "Contemplative Practices",
-    description: "Deepen your spiritual development through meditation and inquiry",
-    icon: Mountain,
-    color: "bg-purple-100 border-purple-300",
-    difficulty: "Beginner",
-    duration: "6-8 weeks",
-    unlocked: true,
-    modules: [
-      "Mindfulness Meditation",
-      "Self-Inquiry Practices",
-      "Loving-Kindness Cultivation",
-      "Witness Consciousness Development",
-    ],
-    benefits: ["Enhanced presence", "Deeper self-understanding", "Emotional stability", "Spiritual insight"],
-  },
-  {
-    id: "philosophical-expansion",
-    title: "Philosophical Frameworks",
-    description: "Explore diverse wisdom traditions and philosophical perspectives",
-    icon: Brain,
-    color: "bg-blue-100 border-blue-300",
-    difficulty: "Advanced",
-    duration: "8-10 weeks",
-    unlocked: false,
-    prerequisite: "Complete Shadow Work Integration",
-    modules: [
-      "Eastern Philosophy Integration",
-      "Western Philosophical Traditions",
-      "Indigenous Wisdom Ways",
-      "Postmodern Perspectives",
-    ],
-    benefits: ["Expanded worldview", "Critical thinking skills", "Cultural sensitivity", "Intellectual humility"],
-  },
-  {
-    id: "spiritual-states",
-    title: "States of Consciousness",
-    description: "Explore and stabilize higher states of consciousness",
-    icon: Star,
-    color: "bg-yellow-100 border-yellow-300",
-    difficulty: "Advanced",
-    duration: "10-12 weeks",
-    unlocked: false,
-    prerequisite: "Complete Contemplative Practices",
-    modules: [
-      "Altered State Exploration",
-      "Psychedelic Integration",
-      "Mystical Experience Processing",
-      "State-Stage Integration",
-    ],
-    benefits: ["Expanded consciousness", "Spiritual awakening", "Enhanced creativity", "Transcendent perspective"],
-  },
-  {
-    id: "somatic-integration",
-    title: "Embodied Development",
-    description: "Integrate development through body awareness and movement",
-    icon: Waves,
-    color: "bg-green-100 border-green-300",
-    difficulty: "Intermediate",
-    duration: "6-8 weeks",
-    unlocked: true,
-    modules: [
-      "Body Awareness Practices",
-      "Emotional Release Techniques",
-      "Movement Meditation",
-      "Trauma-Informed Integration",
-    ],
-    benefits: ["Body-mind integration", "Emotional regulation", "Stress reduction", "Grounded presence"],
-  },
-  {
-    id: "collective-intelligence",
-    title: "Collective Intelligence",
-    description: "Develop skills for group wisdom and collective consciousness",
-    icon: Compass,
-    color: "bg-orange-100 border-orange-300",
-    difficulty: "Advanced",
-    duration: "8-10 weeks",
-    unlocked: false,
-    prerequisite: "Complete 2 other packs",
-    modules: [
-      "Group Facilitation Skills",
-      "Collective Sensing",
-      "Dialogue and Deep Listening",
-      "Systems Thinking Application",
-    ],
-    benefits: ["Leadership skills", "Group harmony", "Systems awareness", "Collective wisdom"],
-  },
-]
-
 export default function ExpansionPacks({ userProfile }: ExpansionPacksProps) {
-  const getRecommendedPacks = () => {
-    const recommendations = []
+  const [activeTab, setActiveTab] = useState("available")
+  const [installedPacks, setInstalledPacks] = useState<string[]>([])
 
-    // Based on developmental lines
-    if (userProfile.developmentalLines.emotional < 6) {
-      recommendations.push("shadow-work")
-    }
-    if (userProfile.developmentalLines.spiritual < 7) {
-      recommendations.push("contemplative-tools")
-    }
-    if (userProfile.developmentalLines.kinesthetic < 6) {
-      recommendations.push("somatic-integration")
-    }
+  const expansionPacks = [
+    {
+      id: "leadership",
+      title: "Leadership Development",
+      description: "Advanced leadership skills through integral theory",
+      category: "Professional",
+      icon: Users,
+      difficulty: "Intermediate",
+      duration: "6-8 weeks",
+      modules: 12,
+      rating: 4.8,
+      price: "Free",
+      features: [
+        "Integral Leadership Assessment",
+        "Team Development Tools",
+        "Conflict Resolution Framework",
+        "Vision & Strategy Planning",
+      ],
+      preview: "Learn to lead with awareness across all four quadrants of experience",
+    },
+    {
+      id: "relationships",
+      title: "Conscious Relationships",
+      description: "Deepen intimacy and connection through integral awareness",
+      category: "Personal",
+      icon: Heart,
+      difficulty: "Beginner",
+      duration: "4-6 weeks",
+      modules: 8,
+      rating: 4.9,
+      price: "Free",
+      features: ["Relationship Mapping", "Communication Patterns", "Conflict Transformation", "Intimacy Development"],
+      preview: "Transform your relationships through integral understanding",
+    },
+    {
+      id: "business",
+      title: "Integral Business",
+      description: "Apply integral principles to business and entrepreneurship",
+      category: "Professional",
+      icon: Briefcase,
+      difficulty: "Advanced",
+      duration: "8-10 weeks",
+      modules: 16,
+      rating: 4.7,
+      price: "Free",
+      features: ["Business Model Canvas", "Stakeholder Analysis", "Cultural Assessment", "Systems Thinking Tools"],
+      preview: "Build businesses that serve all stakeholders and levels of development",
+    },
+    {
+      id: "creativity",
+      title: "Creative Expression",
+      description: "Unlock creativity through integral development",
+      category: "Personal",
+      icon: Sparkles,
+      difficulty: "Beginner",
+      duration: "3-4 weeks",
+      modules: 6,
+      rating: 4.6,
+      price: "Free",
+      features: ["Creative Process Mapping", "Inspiration Techniques", "Block Dissolution", "Expression Channels"],
+      preview: "Express your authentic self through various creative mediums",
+    },
+    {
+      id: "learning",
+      title: "Accelerated Learning",
+      description: "Learn faster and more effectively using integral methods",
+      category: "Educational",
+      icon: Brain,
+      difficulty: "Intermediate",
+      duration: "5-6 weeks",
+      modules: 10,
+      rating: 4.8,
+      price: "Free",
+      features: ["Learning Style Assessment", "Memory Techniques", "Comprehension Strategies", "Knowledge Integration"],
+      preview: "Master any subject using integral learning principles",
+    },
+    {
+      id: "wellness",
+      title: "Integral Wellness",
+      description: "Holistic health across body, mind, and spirit",
+      category: "Health",
+      icon: Heart,
+      difficulty: "Beginner",
+      duration: "6-8 weeks",
+      modules: 14,
+      rating: 4.9,
+      price: "Free",
+      features: ["Wellness Assessment", "Nutrition Planning", "Exercise Integration", "Stress Management"],
+      preview: "Achieve optimal health through integral wellness practices",
+    },
+  ]
 
-    return recommendations
+  const handleInstallPack = (packId: string) => {
+    const user = authService.getCurrentUser()
+    if (user) {
+      const newInstalledPacks = [...installedPacks, packId]
+      setInstalledPacks(newInstalledPacks)
+
+      // Save to storage
+      storageService.saveUserData(user.id, {
+        installedPacks: newInstalledPacks,
+      })
+    }
   }
 
-  const recommendedPacks = getRecommendedPacks()
+  const PackCard = ({ pack, isInstalled = false }: { pack: any; isInstalled?: boolean }) => (
+    <Card className="elevation-1 hover:elevation-2 transition-smooth animate-fade-in">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-primary rounded-lg">
+              <pack.icon className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">{pack.title}</CardTitle>
+              <Badge variant="outline" className="mt-1">
+                {pack.category}
+              </Badge>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Star className="w-3 h-3 fill-current text-yellow-500" />
+              {pack.rating}
+            </div>
+            <Badge variant="secondary" className="mt-1">
+              {pack.price}
+            </Badge>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">{pack.description}</p>
+
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            {pack.duration}
+          </div>
+          <div className="flex items-center gap-1">
+            <BookOpen className="w-3 h-3" />
+            {pack.modules} modules
+          </div>
+          <Badge variant="outline" className="text-xs">
+            {pack.difficulty}
+          </Badge>
+        </div>
+
+        <div className="space-y-2">
+          <h5 className="font-medium text-sm">What you'll learn:</h5>
+          <ul className="space-y-1">
+            {pack.features.slice(0, 3).map((feature: string, index: number) => (
+              <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
+                <CheckCircle className="w-3 h-3 mt-0.5 flex-shrink-0 text-green-500" />
+                {feature}
+              </li>
+            ))}
+            {pack.features.length > 3 && (
+              <li className="text-sm text-muted-foreground">+{pack.features.length - 3} more features</li>
+            )}
+          </ul>
+        </div>
+
+        <div className="pt-2 border-t">
+          {isInstalled ? (
+            <div className="flex gap-2">
+              <Button className="flex-1 animate-ripple" size="sm">
+                <Play className="w-3 h-3 mr-2" />
+                Continue
+              </Button>
+              <Button variant="outline" size="sm" className="animate-ripple bg-transparent">
+                <BookOpen className="w-3 h-3" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Button
+                className="flex-1 animate-ripple elevation-1"
+                size="sm"
+                onClick={() => handleInstallPack(pack.id)}
+              >
+                <Download className="w-3 h-3 mr-2" />
+                Install Pack
+              </Button>
+              <Button variant="outline" size="sm" className="animate-ripple bg-transparent">
+                Preview
+              </Button>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+
+  const CategoryFilter = ({ categories }: { categories: string[] }) => (
+    <div className="flex flex-wrap gap-2 mb-6">
+      <Button variant="outline" size="sm" className="animate-ripple bg-transparent">
+        All Categories
+      </Button>
+      {categories.map((category) => (
+        <Button key={category} variant="ghost" size="sm" className="animate-ripple">
+          {category}
+        </Button>
+      ))}
+    </div>
+  )
+
+  const categories = [...new Set(expansionPacks.map((pack) => pack.category))]
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <Card>
+      <Card className="elevation-2">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Plus className="w-5 h-5 text-purple-600" />
+            <Plus className="w-5 h-5" />
             Expansion Packs
           </CardTitle>
-          <p className="text-gray-600">Modular development programs to advance your integral growth</p>
+          <p className="text-muted-foreground">Specialized learning modules to deepen your integral development</p>
         </CardHeader>
       </Card>
 
-      {/* Recommended Section */}
-      {recommendedPacks.length > 0 && (
-        <Card className="border-purple-200 bg-purple-50">
-          <CardHeader>
-            <CardTitle className="text-lg text-purple-800">Recommended for You</CardTitle>
-            <p className="text-purple-700">Based on your current development profile</p>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {expansionPacks
-                .filter((pack) => recommendedPacks.includes(pack.id))
-                .map((pack) => (
-                  <div key={pack.id} className="p-4 bg-white rounded-lg border border-purple-200">
-                    <div className="flex items-center gap-3 mb-2">
-                      <pack.icon className="w-5 h-5 text-purple-600" />
-                      <span className="font-medium">{pack.title}</span>
-                      <Badge className="bg-purple-100 text-purple-800">Recommended</Badge>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-3">{pack.description}</p>
-                    <Button size="sm" className="w-full">
-                      Start Pack
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-3 bg-card elevation-1">
+          <TabsTrigger value="available" className="animate-ripple">
+            <BookOpen className="w-4 h-4 mr-2" />
+            Available
+          </TabsTrigger>
+          <TabsTrigger value="installed" className="animate-ripple">
+            <Download className="w-4 h-4 mr-2" />
+            Installed ({installedPacks.length})
+          </TabsTrigger>
+          <TabsTrigger value="featured" className="animate-ripple">
+            <Star className="w-4 h-4 mr-2" />
+            Featured
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="available" className="space-y-6">
+          <CategoryFilter categories={categories} />
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {expansionPacks
+              .filter((pack) => !installedPacks.includes(pack.id))
+              .map((pack) => (
+                <PackCard key={pack.id} pack={pack} />
+              ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="installed" className="space-y-6">
+          {installedPacks.length === 0 ? (
+            <Card className="elevation-1">
+              <CardContent className="text-center py-12">
+                <div className="space-y-4">
+                  <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
+                    <Download className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium mb-2">No Packs Installed</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Install expansion packs to access specialized learning modules
+                    </p>
+                    <Button onClick={() => setActiveTab("available")} className="animate-ripple">
+                      Browse Available Packs
                     </Button>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {expansionPacks
+                .filter((pack) => installedPacks.includes(pack.id))
+                .map((pack) => (
+                  <PackCard key={pack.id} pack={pack} isInstalled={true} />
                 ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </TabsContent>
 
-      {/* All Expansion Packs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {expansionPacks.map((pack) => (
-          <Card key={pack.id} className={`${pack.color} relative`}>
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <pack.icon className="w-6 h-6" />
-                  <div>
-                    <CardTitle className="text-lg">{pack.title}</CardTitle>
-                    <p className="text-sm text-gray-600 mt-1">{pack.description}</p>
-                  </div>
-                </div>
-                {pack.unlocked ? (
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                ) : (
-                  <Lock className="w-5 h-5 text-gray-400" />
-                )}
-              </div>
-
-              <div className="flex gap-2 mt-3">
-                <Badge variant="outline">{pack.difficulty}</Badge>
-                <Badge variant="outline">{pack.duration}</Badge>
-              </div>
-
-              {!pack.unlocked && pack.prerequisite && (
-                <div className="text-xs text-gray-600 mt-2">
-                  <Lock className="w-3 h-3 inline mr-1" />
-                  Requires: {pack.prerequisite}
-                </div>
-              )}
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-              {/* Modules */}
-              <div>
-                <h4 className="font-medium text-sm mb-2">Modules Included:</h4>
-                <ul className="text-xs text-gray-600 space-y-1">
-                  {pack.modules.map((module, index) => (
-                    <li key={index} className="flex items-center gap-2">
-                      <div className="w-1 h-1 bg-gray-400 rounded-full" />
-                      {module}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Benefits */}
-              <div>
-                <h4 className="font-medium text-sm mb-2">Key Benefits:</h4>
-                <div className="flex flex-wrap gap-1">
-                  {pack.benefits.map((benefit, index) => (
-                    <Badge key={index} variant="secondary" className="text-xs">
-                      {benefit}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              {/* Action Button */}
-              <Button
-                className="w-full mt-4"
-                disabled={!pack.unlocked}
-                variant={pack.unlocked ? "default" : "secondary"}
-              >
-                {pack.unlocked ? "Start Pack" : "Locked"}
-              </Button>
-
-              {/* Progress for started packs */}
-              {pack.unlocked && Math.random() > 0.7 && (
-                <div className="mt-3">
-                  <div className="flex justify-between text-xs text-gray-600 mb-1">
-                    <span>Progress</span>
-                    <span>2/4 modules</span>
-                  </div>
-                  <Progress value={50} className="h-2" />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Custom Pack Builder */}
-      <Card className="border-dashed border-2 border-gray-300">
-        <CardContent className="text-center py-12">
-          <Plus className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-700 mb-2">Create Custom Pack</h3>
-          <p className="text-gray-600 mb-4">Design your own development program based on your specific needs</p>
-          <Button variant="outline">Build Custom Pack</Button>
-        </CardContent>
-      </Card>
+        <TabsContent value="featured" className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {expansionPacks
+              .filter((pack) => pack.rating >= 4.8)
+              .map((pack) => (
+                <PackCard key={pack.id} pack={pack} isInstalled={installedPacks.includes(pack.id)} />
+              ))}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
