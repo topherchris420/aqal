@@ -1,63 +1,20 @@
-import { randomUUID } from "nanoid"
-import type { Session } from "next-auth"
+import { nanoid } from "nanoid"
 
-interface User {
+export interface User {
   id: string
-  email: string
   name: string
-  role: "admin" | "user" | "guest"
+  email: string
   avatar?: string
-  preferences?: {
-    theme: "light" | "dark" | "system"
-    notifications: boolean
-    privacy: "public" | "private"
-  }
+  role: "admin" | "user" | "guest"
+  createdAt: string
+  lastActive: string
 }
 
-interface AuthState {
+export interface AuthState {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
 }
-
-// Demo users for self-contained authentication
-const demoUsers: User[] = [
-  {
-    id: "1",
-    email: "admin@aqal-app.com",
-    name: "Admin User",
-    role: "admin",
-    avatar: "/placeholder-user.jpg",
-    preferences: {
-      theme: "system",
-      notifications: true,
-      privacy: "private",
-    },
-  },
-  {
-    id: "2",
-    email: "user@aqal-app.com",
-    name: "Demo User",
-    role: "user",
-    avatar: "/placeholder-user.jpg",
-    preferences: {
-      theme: "light",
-      notifications: true,
-      privacy: "public",
-    },
-  },
-  {
-    id: "3",
-    email: "guest@aqal-app.com",
-    name: "Guest User",
-    role: "guest",
-    preferences: {
-      theme: "system",
-      notifications: false,
-      privacy: "private",
-    },
-  },
-]
 
 class AuthService {
   private static instance: AuthService
@@ -66,7 +23,7 @@ class AuthService {
     isAuthenticated: false,
     isLoading: false,
   }
-  private listeners: ((state: AuthState) => void)[] = []
+  private subscribers: ((state: AuthState) => void)[] = []
 
   static getInstance(): AuthService {
     if (!AuthService.instance) {
@@ -80,115 +37,142 @@ class AuthService {
   }
 
   private initializeAuth() {
-    if (typeof window !== "undefined") {
-      const savedUser = localStorage.getItem("aqal_user")
-      if (savedUser) {
-        try {
-          const user = JSON.parse(savedUser)
-          this.authState = {
-            user,
-            isAuthenticated: true,
-            isLoading: false,
-          }
-        } catch (error) {
-          console.error("Failed to parse saved user:", error)
-          localStorage.removeItem("aqal_user")
+    // Check for existing session
+    const savedUser = localStorage.getItem("aqal_user")
+    if (savedUser) {
+      try {
+        const user = JSON.parse(savedUser)
+        this.authState = {
+          user,
+          isAuthenticated: true,
+          isLoading: false,
         }
+        this.notifySubscribers()
+      } catch (error) {
+        console.error("Failed to parse saved user:", error)
+        localStorage.removeItem("aqal_user")
       }
     }
   }
 
-  subscribe(listener: (state: AuthState) => void) {
-    this.listeners.push(listener)
+  subscribe(callback: (state: AuthState) => void): () => void {
+    this.subscribers.push(callback)
+    // Immediately call with current state
+    callback(this.authState)
+
+    // Return unsubscribe function
     return () => {
-      this.listeners = this.listeners.filter((l) => l !== listener)
+      this.subscribers = this.subscribers.filter((sub) => sub !== callback)
     }
   }
 
-  private notify() {
-    this.listeners.forEach((listener) => listener(this.authState))
+  private notifySubscribers() {
+    this.subscribers.forEach((callback) => callback(this.authState))
   }
 
-  async signIn(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+  async signInAsGuest(): Promise<{ success: boolean; user?: User; error?: string }> {
     this.authState.isLoading = true
-    this.notify()
+    this.notifySubscribers()
 
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      // Simulate network delay
+      await new Promise((resolve) => setTimeout(resolve, 500))
 
-    const user = demoUsers.find((u) => u.email === email)
+      const guestUser: User = {
+        id: `guest_${nanoid(8)}`,
+        name: "Guest User",
+        email: "guest@aqal-studio.com",
+        role: "guest",
+        createdAt: new Date().toISOString(),
+        lastActive: new Date().toISOString(),
+      }
 
-    if (!user) {
-      this.authState.isLoading = false
-      this.notify()
-      return { success: false, error: "User not found" }
-    }
-
-    // In a real app, you'd verify the password hash
-    const validPasswords = {
-      "admin@aqal-app.com": "admin123",
-      "user@aqal-app.com": "user123",
-      "guest@aqal-app.com": "guest123",
-    }
-
-    if (validPasswords[email as keyof typeof validPasswords] !== password) {
-      this.authState.isLoading = false
-      this.notify()
-      return { success: false, error: "Invalid password" }
-    }
-
-    this.authState = {
-      user,
-      isAuthenticated: true,
-      isLoading: false,
-    }
-
-    if (typeof window !== "undefined") {
-      localStorage.setItem("aqal_user", JSON.stringify(user))
-    }
-
-    this.notify()
-    return { success: true }
-  }
-
-  async signInAsGuest(): Promise<{ success: boolean }> {
-    this.authState.isLoading = true
-    this.notify()
-
-    await new Promise((resolve) => setTimeout(resolve, 500))
-
-    const guestUser = demoUsers.find((u) => u.role === "guest")!
-
-    this.authState = {
-      user: guestUser,
-      isAuthenticated: true,
-      isLoading: false,
-    }
-
-    if (typeof window !== "undefined") {
+      // Save to localStorage
       localStorage.setItem("aqal_user", JSON.stringify(guestUser))
-    }
 
-    this.notify()
-    return { success: true }
+      this.authState = {
+        user: guestUser,
+        isAuthenticated: true,
+        isLoading: false,
+      }
+
+      this.notifySubscribers()
+
+      return { success: true, user: guestUser }
+    } catch (error) {
+      this.authState.isLoading = false
+      this.notifySubscribers()
+      return { success: false, error: "Failed to create guest session" }
+    }
+  }
+
+  async signIn(email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
+    this.authState.isLoading = true
+    this.notifySubscribers()
+
+    try {
+      // Simulate network delay
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      // Demo users for development
+      const demoUsers: User[] = [
+        {
+          id: "admin_001",
+          name: "Admin User",
+          email: "admin@aqal-studio.com",
+          role: "admin",
+          createdAt: "2024-01-01T00:00:00Z",
+          lastActive: new Date().toISOString(),
+        },
+        {
+          id: "user_001",
+          name: "Demo User",
+          email: "user@aqal-studio.com",
+          role: "user",
+          createdAt: "2024-01-01T00:00:00Z",
+          lastActive: new Date().toISOString(),
+        },
+      ]
+
+      const user = demoUsers.find((u) => u.email === email)
+
+      if (user && password === "demo123") {
+        // Update last active
+        user.lastActive = new Date().toISOString()
+
+        // Save to localStorage
+        localStorage.setItem("aqal_user", JSON.stringify(user))
+
+        this.authState = {
+          user,
+          isAuthenticated: true,
+          isLoading: false,
+        }
+
+        this.notifySubscribers()
+        return { success: true, user }
+      } else {
+        this.authState.isLoading = false
+        this.notifySubscribers()
+        return { success: false, error: "Invalid credentials" }
+      }
+    } catch (error) {
+      this.authState.isLoading = false
+      this.notifySubscribers()
+      return { success: false, error: "Sign in failed" }
+    }
   }
 
   async signOut(): Promise<void> {
+    localStorage.removeItem("aqal_user")
+
     this.authState = {
       user: null,
       isAuthenticated: false,
       isLoading: false,
     }
 
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("aqal_user")
-    }
-
-    this.notify()
-  }
-
-  getAuthState(): AuthState {
-    return this.authState
+    this.notifySubscribers()
   }
 
   getCurrentUser(): User | null {
@@ -199,60 +183,28 @@ class AuthService {
     return this.authState.isAuthenticated
   }
 
-  hasRole(role: string): boolean {
-    return this.authState.user?.role === role
-  }
-
-  async updateUserPreferences(preferences: Partial<User["preferences"]>): Promise<void> {
-    if (!this.authState.user) return
-
-    const updatedUser = {
-      ...this.authState.user,
-      preferences: {
-        ...this.authState.user.preferences,
-        ...preferences,
-      },
-    }
-
-    this.authState.user = updatedUser
-
-    if (typeof window !== "undefined") {
-      localStorage.setItem("aqal_user", JSON.stringify(updatedUser))
-    }
-
-    this.notify()
+  getAuthState(): AuthState {
+    return this.authState
   }
 }
 
 export const authService = AuthService.getInstance()
-export type { User, AuthState, Session }
 
-/**
- * Lightweight, self-contained auth helpers.
- *
- * These satisfy legacy named-export requirements (`createGuestSession`
- * and `authOptions`) while delegating to the new `AuthService`.
- */
-
-/**
- * Create a minimal guest session object.
- * In production you’d persist this to StorageService or a DB.
- */
-export function createGuestSession(): Session {
-  return {
-    id: randomUUID(),
-    role: "guest",
-    createdAt: Date.now(),
-  }
+// Legacy exports for backward compatibility
+export function createGuestSession(): Promise<User> {
+  return authService.signInAsGuest().then((result) => {
+    if (result.success && result.user) {
+      return result.user
+    }
+    throw new Error(result.error || "Failed to create guest session")
+  })
 }
 
-/**
- * Dummy `authOptions` kept only for backward compatibility with
- * older code that imported it (e.g. NextAuth).
- * New code should prefer the in-house `AuthService`.
- */
 export const authOptions = {
-  session: { strategy: "jwt" },
+  // Legacy NextAuth options - now handled by AuthService
   providers: [],
-  pages: {},
+  callbacks: {},
+  pages: {
+    signIn: "/auth/signin",
+  },
 }

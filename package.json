@@ -67,7 +67,6 @@
     ]
   },
   "dependencies": {
-    "@auth/core": "latest",
     "@hello-pangea/dnd": "latest",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "latest",
@@ -109,9 +108,7 @@
     "lucide-react": "^0.454.0",
     "nanoid": "latest",
     "next": "14.2.16",
-    "next-auth": "latest",
     "next-themes": "latest",
-    "nodemailer": "latest",
     "react": "^18",
     "react-day-picker": "latest",
     "react-dom": "^18",

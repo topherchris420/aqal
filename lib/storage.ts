@@ -1,20 +1,25 @@
-interface StorageItem<T = any> {
-  data: T
+import { nanoid } from "nanoid"
+
+interface StorageItem {
+  id: string
+  data: any
   timestamp: number
   ttl?: number
   version: string
 }
 
 interface UserData {
-  profile: any
-  progress: Record<string, any>
-  preferences: any
-  analytics: any
+  profile?: any
+  progress?: any
+  insights?: any
+  preferences?: any
+  installedPacks?: string[]
 }
 
 class StorageService {
   private static instance: StorageService
-  private readonly VERSION = "1.0.0"
+  private readonly STORAGE_PREFIX = "aqal_"
+  private readonly CURRENT_VERSION = "1.0.0"
   private readonly DEFAULT_TTL = 7 * 24 * 60 * 60 * 1000 // 7 days
   private readonly MAX_STORAGE_SIZE = 50 * 1024 * 1024 // 50MB
 
@@ -29,8 +34,8 @@ class StorageService {
     this.cleanup()
   }
 
-  private getStorageKey(key: string): string {
-    return `aqal_${key}`
+  private getKey(key: string): string {
+    return `${this.STORAGE_PREFIX}${key}`
   }
 
   private isExpired(item: StorageItem): boolean {
@@ -39,71 +44,79 @@ class StorageService {
   }
 
   private cleanup(): void {
-    if (typeof window === "undefined") return
+    const keys = Object.keys(localStorage).filter((key) => key.startsWith(this.STORAGE_PREFIX))
 
-    try {
-      const keys = Object.keys(localStorage).filter((key) => key.startsWith("aqal_"))
-
-      keys.forEach((key) => {
-        try {
-          const item = JSON.parse(localStorage.getItem(key) || "{}")
-          if (this.isExpired(item)) {
-            localStorage.removeItem(key)
-          }
-        } catch (error) {
-          // Remove corrupted items
+    keys.forEach((key) => {
+      try {
+        const item = JSON.parse(localStorage.getItem(key) || "{}")
+        if (this.isExpired(item)) {
           localStorage.removeItem(key)
         }
-      })
-
-      // Check storage size and cleanup if needed
-      this.enforceStorageLimit()
-    } catch (error) {
-      console.warn("Storage cleanup failed:", error)
-    }
-  }
-
-  private enforceStorageLimit(): void {
-    if (typeof window === "undefined") return
-
-    try {
-      const storageSize = new Blob(Object.values(localStorage)).size
-
-      if (storageSize > this.MAX_STORAGE_SIZE) {
-        // Remove oldest items first
-        const items = Object.keys(localStorage)
-          .filter((key) => key.startsWith("aqal_"))
-          .map((key) => {
-            try {
-              const item = JSON.parse(localStorage.getItem(key) || "{}")
-              return { key, timestamp: item.timestamp || 0 }
-            } catch {
-              return { key, timestamp: 0 }
-            }
-          })
-          .sort((a, b) => a.timestamp - b.timestamp)
-
-        // Remove oldest 25% of items
-        const itemsToRemove = items.slice(0, Math.ceil(items.length * 0.25))
-        itemsToRemove.forEach((item) => localStorage.removeItem(item.key))
+      } catch (error) {
+        // Remove corrupted items
+        localStorage.removeItem(key)
       }
-    } catch (error) {
-      console.warn("Storage limit enforcement failed:", error)
+    })
+  }
+
+  private getStorageSize(): number {
+    let total = 0
+    const keys = Object.keys(localStorage).filter((key) => key.startsWith(this.STORAGE_PREFIX))
+
+    keys.forEach((key) => {
+      const value = localStorage.getItem(key)
+      if (value) {
+        total += value.length
+      }
+    })
+
+    return total
+  }
+
+  private makeSpace(requiredSize: number): void {
+    if (this.getStorageSize() + requiredSize <= this.MAX_STORAGE_SIZE) {
+      return
+    }
+
+    // Get all items with timestamps
+    const items: { key: string; timestamp: number }[] = []
+    const keys = Object.keys(localStorage).filter((key) => key.startsWith(this.STORAGE_PREFIX))
+
+    keys.forEach((key) => {
+      try {
+        const item = JSON.parse(localStorage.getItem(key) || "{}")
+        items.push({ key, timestamp: item.timestamp || 0 })
+      } catch (error) {
+        localStorage.removeItem(key)
+      }
+    })
+
+    // Sort by timestamp (oldest first)
+    items.sort((a, b) => a.timestamp - b.timestamp)
+
+    // Remove oldest items until we have enough space
+    for (const item of items) {
+      localStorage.removeItem(item.key)
+      if (this.getStorageSize() + requiredSize <= this.MAX_STORAGE_SIZE) {
+        break
+      }
     }
   }
 
-  set<T>(key: string, data: T, ttl?: number): boolean {
-    if (typeof window === "undefined") return false
-
+  set(key: string, data: any, ttl?: number): boolean {
     try {
-      const item: StorageItem<T> = {
+      const item: StorageItem = {
+        id: nanoid(),
         data,
         timestamp: Date.now(),
         ttl: ttl || this.DEFAULT_TTL,
-        version: this.VERSION,
+        version: this.CURRENT_VERSION,
       }
 
-      localStorage.setItem(this.getStorageKey(key), JSON.stringify(item))
+      const serialized = JSON.stringify(item)
+      this.makeSpace(serialized.length)
+
+      localStorage.setItem(this.getKey(key), serialized)
       return true
     } catch (error) {
       console.error("Storage set failed:", error)
@@ -112,32 +125,28 @@ class StorageService {
   }
 
   get<T>(key: string): T | null {
-    if (typeof window === "undefined") return null
-
     try {
-      const stored = localStorage.getItem(this.getStorageKey(key))
-      if (!stored) return null
+      const serialized = localStorage.getItem(this.getKey(key))
+      if (!serialized) return null
 
-      const item: StorageItem<T> = JSON.parse(stored)
+      const item: StorageItem = JSON.parse(serialized)
 
       if (this.isExpired(item)) {
-        this.remove(key)
+        localStorage.removeItem(this.getKey(key))
         return null
       }
 
-      return item.data
+      return item.data as T
     } catch (error) {
       console.error("Storage get failed:", error)
-      this.remove(key) // Remove corrupted item
+      localStorage.removeItem(this.getKey(key))
       return null
     }
   }
 
   remove(key: string): boolean {
-    if (typeof window === "undefined") return false
-
     try {
-      localStorage.removeItem(this.getStorageKey(key))
+      localStorage.removeItem(this.getKey(key))
       return true
     } catch (error) {
       console.error("Storage remove failed:", error)
@@ -146,10 +155,8 @@ class StorageService {
   }
 
   clear(): boolean {
-    if (typeof window === "undefined") return false
-
     try {
-      const keys = Object.keys(localStorage).filter((key) => key.startsWith("aqal_"))
+      const keys = Object.keys(localStorage).filter((key) => key.startsWith(this.STORAGE_PREFIX))
       keys.forEach((key) => localStorage.removeItem(key))
       return true
     } catch (error) {
@@ -158,121 +165,92 @@ class StorageService {
     }
   }
 
-  // User data specific methods
-  saveUserData(userId: string, data: Partial<UserData>): boolean {
-    const existing = this.getUserData(userId) || {}
-    const merged = { ...existing, ...data }
-    return this.set(`user_${userId}`, merged)
+  // User-specific data management
+  saveUserData(userId: string, data: UserData): boolean {
+    return this.set(`user_${userId}`, data)
   }
 
   getUserData(userId: string): UserData | null {
     return this.get<UserData>(`user_${userId}`)
   }
 
+  // Export/Import functionality
   exportUserData(userId: string): string | null {
     const userData = this.getUserData(userId)
     if (!userData) return null
 
-    try {
-      return JSON.stringify(
-        {
-          ...userData,
-          exportedAt: new Date().toISOString(),
-          version: this.VERSION,
-        },
-        null,
-        2,
-      )
-    } catch (error) {
-      console.error("Export failed:", error)
-      return null
+    const exportData = {
+      userId,
+      data: userData,
+      exportedAt: new Date().toISOString(),
+      version: this.CURRENT_VERSION,
     }
+
+    return JSON.stringify(exportData, null, 2)
   }
 
-  importUserData(userId: string, jsonData: string): boolean {
+  importUserData(userId: string, importData: string): boolean {
     try {
-      const data = JSON.parse(jsonData)
+      const parsed = JSON.parse(importData)
 
-      // Validate data structure
-      if (!data || typeof data !== "object") {
-        throw new Error("Invalid data format")
+      if (!parsed.data || !parsed.version) {
+        throw new Error("Invalid import format")
       }
 
-      // Remove metadata
-      const { exportedAt, version, ...userData } = data
-
-      return this.saveUserData(userId, userData)
+      return this.saveUserData(userId, parsed.data)
     } catch (error) {
       console.error("Import failed:", error)
       return false
     }
   }
 
-  // Analytics and caching
-  cacheAnalytics(data: any): boolean {
-    return this.set("analytics", data, 24 * 60 * 60 * 1000) // 24 hours
-  }
-
-  getCachedAnalytics(): any {
-    return this.get("analytics")
-  }
-
-  // Session management
-  setSession(sessionData: any): boolean {
-    return this.set("session", sessionData, 60 * 60 * 1000) // 1 hour
-  }
-
-  getSession(): any {
-    return this.get("session")
-  }
-
-  clearSession(): boolean {
-    return this.remove("session")
-  }
-
-  // Storage info
-  getStorageInfo(): {
-    used: number
-    available: number
+  // Analytics and monitoring
+  getStorageStats(): {
+    totalSize: number
     itemCount: number
-    version: string
+    oldestItem: number
+    newestItem: number
   } {
-    if (typeof window === "undefined") {
-      return { used: 0, available: 0, itemCount: 0, version: this.VERSION }
-    }
+    const keys = Object.keys(localStorage).filter((key) => key.startsWith(this.STORAGE_PREFIX))
+    let totalSize = 0
+    let oldestTimestamp = Date.now()
+    let newestTimestamp = 0
 
-    try {
-      const keys = Object.keys(localStorage).filter((key) => key.startsWith("aqal_"))
-      const used = new Blob(keys.map((key) => localStorage.getItem(key) || "")).size
-
-      return {
-        used,
-        available: this.MAX_STORAGE_SIZE - used,
-        itemCount: keys.length,
-        version: this.VERSION,
+    keys.forEach((key) => {
+      const value = localStorage.getItem(key)
+      if (value) {
+        totalSize += value.length
+        try {
+          const item = JSON.parse(value)
+          if (item.timestamp) {
+            oldestTimestamp = Math.min(oldestTimestamp, item.timestamp)
+            newestTimestamp = Math.max(newestTimestamp, item.timestamp)
+          }
+        } catch (error) {
+          // Ignore parsing errors
+        }
       }
-    } catch (error) {
-      return { used: 0, available: 0, itemCount: 0, version: this.VERSION }
+    })
+
+    return {
+      totalSize,
+      itemCount: keys.length,
+      oldestItem: oldestTimestamp,
+      newestItem: newestTimestamp,
     }
-  }
-}
-
-type Json = Record<string, unknown> | Array<unknown> | string | number | boolean | null
-
-const memoryStore = new Map<string, Json>()
-
-/**
- * Persist arbitrary JSON under the supplied key.  Currently uses an
- * in-memory Map so it works both server- and client-side during build
- * and runtime.  Swap out with your real StorageService when ready.
- */
-export async function saveSession(key: string, data: Json): Promise<void> {
-  try {
-    memoryStore.set(key, data)
-  } catch (err) {
-    console.error("[storage] saveSession failed:", err)
   }
 }
 
 export const storageService = StorageService.getInstance()
-export type { UserData, StorageItem }
+
+// Legacy export for backward compatibility
+export function saveSession(sessionData: any): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const success = storageService.set("session", sessionData)
+    if (success) {
+      resolve()
+    } else {
+      reject(new Error("Failed to save session"))
+    }
+  })
+}
